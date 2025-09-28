@@ -23,7 +23,7 @@ app.use((req, res, next) => {
 });
 app.use(express.json());
 app.use(express.urlencoded({extended: true}));
-app.use(cors({origin: 'https://blog-website-frontend-ok5g-ivtgyk13x-tobi-s-projects-59df0dff.vercel.app', credentials: true})); // Allow CORS for the frontend app
+app.use(cors({origin: 'https://blog-website-frontend-ok5g.vercel.app/', credentials: true})); // Allow CORS for the frontend app
 app.use(upload({
     useTempFiles: true,
     tempFileDir: '/tmp/' // or any temp dir
