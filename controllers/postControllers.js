@@ -5,6 +5,7 @@ const fs = require('fs');
 const {v4: uuid} = require('uuid')
 const HttpError = require('../models/errorModel');
 const { errorMonitor } = require('stream');
+const cloudinary = require('../cloudinaryConfig');
 
 // ================== CREATE A POST ========================
 // POST : api/posts
@@ -20,14 +21,32 @@ module.exports.createPost = async (req, res, next) =>{
     if(thumbnail.size > 2000000){
         return next(new HttpError('Image is too big, file should be less than 2mb '))
     }
-    let fileName = thumbnail.name;
-    let splittedFileName = fileName.split('.')
-    let newFileName = splittedFileName[0] + uuid() + '.' + splittedFileName[splittedFileName.length - 1]
-    thumbnail.mv(path.join(__dirname, '..', '/uploads', newFileName), async (err) => {
-        if(err){
-            return next(new HttpError(err))
-        } else{
-            const newPost = await postModel.create({title, category, description, thumbnail: newFileName, creator: req.user.id})
+    // let fileName = thumbnail.name;
+    // let splittedFileName = fileName.split('.')
+    // let newFileName = splittedFileName[0] + uuid() + '.' + splittedFileName[splittedFileName.length - 1]
+
+    // Upload to Cloudinary
+    console.log("Thumbnail", thumbnail)
+
+const uploadedThumbnail = await cloudinary.uploader.upload(thumbnail.tempFilePath, {
+    resource_type: "auto",
+    folder: 'thumbnails',
+}).catch(err => {
+        console.error("Cloudinary Upload error", err);
+});
+if(!uploadedThumbnail || !uploadedThumbnail.public_id){
+    return next(new HttpError('Image upload failed, try again', 500))
+}
+
+console.log('Uploaded Image:', uploadedThumbnail);
+
+
+    const thumbnailID = uploadedThumbnail.public_id + '.' + uploadedThumbnail.format;
+
+
+
+    // SEND UNIQUE IMAGE CLOUDINARY PATH TO DATABASE   
+            const newPost = await postModel.create({title, category, description, thumbnail: thumbnailID, creator: req.user.id})
             if(!newPost){
                 return next(new HttpError("Post couldn't be created", 422))
             }
@@ -37,12 +56,12 @@ module.exports.createPost = async (req, res, next) =>{
             await userModel.findByIdAndUpdate(req.user.id, {posts: userPostCount})
 
             res.status(201).send(newPost);
-        }
-    })
+       
+   
    } catch (error) {
     return next(new HttpError(error))
    }
-}
+};
 
 // ==================  GET ALL POSTS ========================
 // GET : api/posts
@@ -142,29 +161,46 @@ if(oldPost.creator){
        } else{
 
         // delete old thumbnaik from post
-        fs.unlink(path.join(__dirname, "..", "/uploads", oldPost.thumbnail), async (err) => {
-            if (err) {
-                return next(new HttpError(err))
-            }
-        });
+        // fs.unlink(path.join(__dirname, "..", "/uploads", oldPost.thumbnail), async (err) => {
+        //     if (err) {
+        //         return next(new HttpError(err))
+        //     }
+        // });
         // check new thumbnail size
         const {thumbnail} =  req.files;
         if(thumbnail.size > 2000000){
             return next(new HttpError('File size too big, choose a smaller image', 422))
         }
         // edit thumbnail name
-        fileName = thumbnail.name
-        let splittedFileName = fileName.split('.')
-        newFileName = splittedFileName[0] + uuid() + '.' + splittedFileName[splittedFileName.length - 1]
-        // upload thumbnail
-        thumbnail.mv(path.join(__dirname, '..', '/uploads', newFileName), async (err) =>{
-            if(err){
-                return next(new HttpError(err))
-            }
+        // fileName = thumbnail.name
+        // let splittedFileName = fileName.split('.')
+        // newFileName = splittedFileName[0] + uuid() + '.' + splittedFileName[splittedFileName.length - 1]
+        // // upload thumbnail
+        // thumbnail.mv(path.join(__dirname, '..', '/uploads', newFileName), async (err) =>{
+        //     if(err){
+        //         return next(new HttpError(err))
+        //     }
 
-        })
+        // })
 
-        await postModel.findByIdAndUpdate(postId, {title, category, description, thumbnail: newFileName}, {new: true}).then((data) => {
+        console.log("Thumbnail", thumbnail)
+
+const uploadedThumbnail = await cloudinary.uploader.upload(thumbnail.tempFilePath, {
+    resource_type: "auto",
+    folder: 'thumbnails',
+}).catch(err => {
+        console.error("Cloudinary Upload error", err);
+});
+if(!uploadedThumbnail || !uploadedThumbnail.public_id){
+    return next(new HttpError('Image upload failed, try again', 500))
+}
+
+console.log('Uploaded Image:', uploadedThumbnail);
+
+
+    const thumbnailID = uploadedThumbnail.public_id + '.' + uploadedThumbnail.format;
+
+        await postModel.findByIdAndUpdate(postId, {title, category, description, thumbnail: thumbnailID}, {new: true}).then((data) => {
             if(!data){
                 return next(new HttpError('Post was unable to be updated', 400))
             } else{
@@ -184,6 +220,69 @@ if(oldPost.creator){
 }
 
 
+// ====================== LIKE POST ========================
+// PUT : api/posts/like/:id
+//PROTECTED
+
+module.exports.likePost = async (req, res, next) =>{
+    try {
+        const postId = req.params.id;
+        if(!postId){
+            return next(new HttpError('Post unavailable', 400))
+        }
+        const post = await postModel.findById(postId)
+        if(!post){
+            return next(new HttpError('Post not found', 404))
+        }
+       
+        const hasLiked = post.likes.includes(req.user.id);
+        if(hasLiked){
+            // Unlike
+            post.likes = post.likes.filter(id => id.toString() !== req.user.id.toString());
+        } else {
+            // like
+            post.likes.push(req.user.id)
+        }
+       
+       
+       await post.save();
+       res.json(post.likes.length);
+    } catch (error) {
+        return next(new HttpError(error))
+    }
+};
+
+// // ====================== UnLIKE POST ========================
+// // PUT : api/posts/unlike/:id
+// //PROTECTED
+
+// module.exports.unlikePost = async (req, res, next) =>{
+//     try {
+//         const postId = req.params.id;
+//         if(!postId){
+//             return next(new HttpError('Post unavailable', 400))
+//         }
+//         const post = await postModel.findById(postId)
+//         if(!post){
+//             return next(new HttpError('Post not found', 404))
+//         }
+//         const likeCount = post.likes - 1;
+//         const  unlikeUser = req.user.id
+        
+
+
+//         await postModel.findByIdAndUpdate(postId, {likes: likeCount}, {new: true})
+//         .then((data) => {
+//             if(!data){
+//                 return next(new HttpError('Unable to unlike post', 400))
+//             } else{
+//                 res.status(200).send(data)
+//             }
+//         })
+//     } catch (error) {
+//         return next(new HttpError(error))
+//     }
+// }
 
 
 
@@ -200,7 +299,8 @@ module.exports.deletePost = async (req, res, next) =>{
         const post = await postModel.findById(postId)
     //    delete thumbnail from uploads
     if(post.creator){
-        fs.unlink(path.join(__dirname, "..", "/uploads", post?.thumbnail), async (err) => {
+        console.log("Post Thumbnail to delete:", post.thumbnail)
+       await cloudinary.uploader.destroy(post.thumbnail.split('.')[0], async (err, result) => {
             if (err) {
                     return next(new HttpError(err))
                 

@@ -1,5 +1,5 @@
 const express = require('express');
-const { createPost, getPosts, getSinglePost, getCatPosts, getUserPosts, editPost, deletePost } = require('../controllers/postControllers');
+const { createPost, getPosts, getSinglePost, getCatPosts, getUserPosts, editPost, likePost, deletePost } = require('../controllers/postControllers');
 const { authMiddleware } = require('../middleware/authMiddleware');
 
 
@@ -11,6 +11,7 @@ router.get('/:id', getSinglePost);
 router.get('/categories/:category', getCatPosts);
 router.get('/users/:id', getUserPosts);
 router.put('/edit/:id', authMiddleware, editPost);
+router.put('/like/:id', authMiddleware, likePost);
 router.delete('/:id', authMiddleware, deletePost);
 
 

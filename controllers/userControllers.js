@@ -5,7 +5,8 @@ const jwt = require('jsonwebtoken');
 const fs = require('fs');
 const path = require('path');
 const {v4: uuid} = require('uuid');
-
+ const cloudinary = require('../cloudinaryConfig'); 
+ // Comment if you do not want to use Cloudinary for image uploads
 
 // ======================== REGISTER NEW USER ==================//
 // POST : api/users/register
@@ -110,6 +111,7 @@ module.exports.getUser = async (req, res, next) => {
 // POST : api/users/change-avatar
 // PROTECTED
 module.exports.changeAvatar = async (req, res, next) => {
+
    try {
     if(!req.files.avatar){
         return next(new HttpError('Please choose an image', 422))
@@ -119,11 +121,7 @@ module.exports.changeAvatar = async (req, res, next) => {
     const user = await userModel.findById(req.user.id)
     // delete old avatar if exists
     if(user.avatar){
-        fs.unlink(path.join(__dirname, '..', 'uploads', user.avatar ), (err) => {
-            if(err){
-                return next(new HttpError(err))
-            }
-        })
+      await  fs.promises.unlink(path.join(__dirname, '..', 'uploads', user.avatar )).catch(() => { /* ignore errors */ });
     }
 
     const {avatar} = req.files;
@@ -132,27 +130,44 @@ module.exports.changeAvatar = async (req, res, next) => {
         return next(new HttpError('Selected image is too large, it should be less than 500kb'))
     }
 
-    let fileName;
-    fileName = avatar.name;
-    let splittedFileName = fileName.split('.')
-    let newFileName = splittedFileName[0] + uuid() + '.' + splittedFileName[splittedFileName.length - 1]
+    // let fileName;
+    // fileName = avatar.name;
+    // let splittedFileName = fileName.split('.')
+    // let newFileName = splittedFileName[0] + uuid() + '.' + splittedFileName[splittedFileName.length - 1]
 
-    avatar.mv(path.join(__dirname, '..', 'uploads', newFileName), async (err) => {
-       if(err){
-        return next(new HttpError(err))
-       }
 
-       const updatedAvatar = await userModel.findByIdAndUpdate(req.user.id, {avatar: newFileName}, {new: true})
+
+    // Upload to cloudinary
+    // console.log('Avatar File:', avatar);
+    const uploadedImage = await cloudinary.uploader.upload(avatar.tempFilePath, {
+        resource_type: "auto",
+       folder: 'avatars',
+    }).catch(err => {
+       console.error('Cloudinary Upload Error:', err);});
+    if(!uploadedImage || !uploadedImage.public_id){
+        return next(new HttpError('Image upload failed, try again', 500))
+    }
+
+    // console.log('Uploaded Image:', uploadedImage);
+
+        const imageID = uploadedImage.public_id + '.' + uploadedImage.format;
+        
+        // Save the new avatar to the database
+       const updatedAvatar = await userModel.findByIdAndUpdate(req.user.id, {avatar: imageID}, {new: true})
+        
+
 
        if(!updatedAvatar){
         return next(new HttpError('Failed to update', 422))
        }
 
+       
+
        res.status(201).send(updatedAvatar)
-    })
 
    } catch (error) {
-    return next(new HttpError(error, 404))
+    console.error(error); // Log the error for debugging
+    return next(new HttpError('An unexpected error occurred', 500));
    }
 }
 

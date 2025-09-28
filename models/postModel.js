@@ -6,6 +6,7 @@ const postSchema = new mongoose.Schema({
     category: {type: String, enum: ['Agriculture', 'Bussiness', 'Education', 'Entertainment', 'Art', 'Investment', 'Uncategorized', 'Weather'], message: "{VALUE is not supported"},
     description: {type: String, required: true},
     thumbnail: {type: String, required: true},
+    likes: [{type: mongoose.Schema.Types.ObjectId, ref: 'userModel'}],
     creator: {type: mongoose.Schema.Types.ObjectId, ref: 'userModel'}
 }, {timestamps: true});
 
