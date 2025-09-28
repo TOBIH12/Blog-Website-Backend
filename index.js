@@ -15,7 +15,7 @@ const app = express();
 
 
 app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', 'https://blog-website-frontend-ok5g.vercel.app/'); // Replace with your frontend URL
+    res.header('Access-Control-Allow-Origin', 'https://blog-website-frontend-hfwp.vercel.app'); // Replace with your frontend URL
     res.header('Access-Control-Allow-Credentials', 'true');
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
     res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -23,7 +23,7 @@ app.use((req, res, next) => {
 });
 app.use(express.json());
 app.use(express.urlencoded({extended: true}));
-app.use(cors({origin: 'https://blog-website-frontend-ok5g.vercel.app/', credentials: true})); // Allow CORS for the frontend app
+app.use(cors({origin: 'https://blog-website-frontend-hfwp.vercel.app', credentials: true})); // Allow CORS for the frontend app
 app.use(upload({
     useTempFiles: true,
     tempFileDir: '/tmp/' // or any temp dir
